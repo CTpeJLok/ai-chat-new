@@ -1,6 +1,8 @@
-from apps.accounts.models import User
-from apps.spaces.models import Space
 from django.db import models
+
+from apps.accounts.models import User
+from apps.files.models import File
+from apps.spaces.models import Space
 
 
 class Conversation(models.Model):
@@ -20,6 +22,7 @@ class Message(models.Model):
     role = models.CharField(max_length=10, choices=ROLES)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    sources = models.ManyToManyField(File, blank=True, related_name="messages")
 
     class Meta:
         ordering = ["created_at"]

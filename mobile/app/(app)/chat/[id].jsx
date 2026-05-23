@@ -9,12 +9,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { useLocalSearchParams, Stack } from 'expo-router'
-import { Send } from 'lucide-react-native'
+import { Send, FileText, Download } from 'lucide-react-native'
 import { streamChat } from '../../../src/api/sse'
 import { useSpaceStore } from '../../../src/stores/spaceStore'
 import client from '../../../src/api/client'
+import { API_URL } from '../../../src/api/client'
+import storage from '../../../src/storage'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams()
@@ -54,6 +59,9 @@ export default function ChatScreen() {
       conversationId: Number(id),
       spaceId: currentSpace?.id,
       message: text,
+      onSources: (sources) => {
+        setMessages((prev) => prev.map((m) => (m.id === assistantMsg.id ? { ...m, sources } : m)))
+      },
       onChunk: (delta) => {
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantMsg.id ? { ...m, content: m.content + delta } : m))
@@ -128,6 +136,8 @@ export default function ChatScreen() {
 
 function MessageBubble({ message }) {
   const isUser = message.role === 'user'
+  const hasSources = message.sources?.length > 0
+
   return (
     <View style={[styles.bubbleRow, isUser && styles.bubbleRowUser]}>
       <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
@@ -135,7 +145,72 @@ function MessageBubble({ message }) {
           {message.content || '...'}
         </Text>
       </View>
+
+      {hasSources && (
+        <View style={styles.sourcesContainer}>
+          <Text style={styles.sourcesTitle}>Источники:</Text>
+          {message.sources.map((source) => (
+            <SourceItem
+              key={source.id}
+              source={source}
+            />
+          ))}
+        </View>
+      )}
     </View>
+  )
+}
+
+function SourceItem({ source }) {
+  const download = async () => {
+    const token = await storage.getItem('access_token')
+
+    if (Platform.OS === 'web') {
+      const res = await fetch(`${API_URL}/files/${source.id}/download/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = source.name
+      a.click()
+      return
+    }
+
+    const dest = FileSystem.documentDirectory + source.name
+    try {
+      const dl = await FileSystem.downloadAsync(`${API_URL}/files/${source.id}/download/`, dest, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(dl.uri)
+      }
+    } catch (e) {
+      Alert.alert('Ошибка', e.message)
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      style={styles.sourceItem}
+      onPress={download}
+      activeOpacity={0.7}
+    >
+      <FileText
+        color="#6366f1"
+        size={14}
+      />
+      <Text
+        style={styles.sourceName}
+        numberOfLines={1}
+      >
+        {source.name}
+      </Text>
+      <Download
+        color="#9ca3af"
+        size={14}
+      />
+    </TouchableOpacity>
   )
 }
 
@@ -152,6 +227,26 @@ const styles = StyleSheet.create({
   },
   bubbleText: { fontSize: 15, color: '#111827', lineHeight: 21 },
   bubbleTextUser: { color: '#fff' },
+  sourcesContainer: {
+    maxWidth: '80%',
+    marginTop: 4,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 10,
+  },
+  sourcesTitle: { fontSize: 11, color: '#9ca3af', marginBottom: 6, fontWeight: '500' },
+  sourceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  sourceName: { flex: 1, fontSize: 13, color: '#374151' },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',

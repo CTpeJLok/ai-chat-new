@@ -3,18 +3,17 @@ from rest_framework import serializers
 from .models import Conversation, Message
 
 
+class MessageSourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
 class MessageSerializer(serializers.ModelSerializer):
+    sources = MessageSourceSerializer(many=True, read_only=True)
+
     class Meta:
         model = Message
-        fields = ["id", "role", "content", "created_at"]
-
-
-class ConversationSerializer(serializers.ModelSerializer):
-    messages = MessageSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = Conversation
-        fields = ["id", "space", "created_at", "messages"]
+        fields = ["id", "role", "content", "sources", "created_at"]
 
 
 class ConversationListSerializer(serializers.ModelSerializer):
@@ -31,6 +30,14 @@ class ConversationListSerializer(serializers.ModelSerializer):
             return None
         return {
             "role": msg.role,
-            "content": msg.content[:100],  # превью
+            "content": msg.content[:100],
             "created_at": msg.created_at,
         }
+
+
+class ConversationSerializer(serializers.ModelSerializer):
+    messages = MessageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Conversation
+        fields = ["id", "space", "created_at", "messages"]

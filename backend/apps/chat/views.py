@@ -1,14 +1,16 @@
 # chat/views.py
 import json
 
-from apps.chat.models import Conversation, Message
-from apps.chat.serializers import ConversationListSerializer
 from django.http import StreamingHttpResponse
 from openai import OpenAI
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from apps.chat.models import Conversation, Message
+from apps.chat.serializers import ConversationListSerializer
+from apps.files.models import File
 
 from .serializers import ConversationSerializer
 
@@ -63,17 +65,22 @@ class ChatStreamView(APIView):
 
         history = list(conv.messages.values("role", "content").order_by("created_at"))
 
-        context = self._get_rag_context(user_message, space_id)
+        rag_files = self._get_rag_files(user_message, space_id)
 
-        system_prompt = (
-            f"Ты — помощник. Отвечай на русском языке.\n\nКонтекст из файлов пространства:\n{context}"
-            if context
-            else "Ты — помощник. Отвечай на русском языке."
-        )
+        context = "\n\n".join(f"[{f.name}]:\n{f.extracted_text}" for f in rag_files if f.extracted_text)
+
+        system_prompt = "Ты — помощник. Отвечай на русском языке."
+        if context:
+            system_prompt += f"\n\nКонтекст из файлов пространства:\n{context}"
+
+        sources_data = [{"id": f.id, "name": f.name} for f in rag_files]
 
         def event_stream():
             full_response = []
             try:
+                if sources_data:
+                    yield f"data: {json.dumps({'sources': sources_data}, ensure_ascii=False)}\n\n"
+
                 stream = client.chat.completions.create(
                     model="gpt-5",
                     stream=True,
@@ -93,11 +100,14 @@ class ChatStreamView(APIView):
                 yield f"data: {json.dumps({'error': str(e)})}\n\n"
             finally:
                 if full_response:
-                    Message.objects.create(
+                    assistant_msg = Message.objects.create(
                         conversation=conv,
                         role="assistant",
                         content="".join(full_response),
                     )
+                    if rag_files:
+                        assistant_msg.sources.set(rag_files)
+
                 yield "data: [DONE]\n\n"
 
         response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
@@ -105,5 +115,5 @@ class ChatStreamView(APIView):
         response["X-Accel-Buffering"] = "no"
         return response
 
-    def _get_rag_context(self, query, space_id) -> str:
-        return ""
+    def _get_rag_files(self, query: str, space_id) -> list:
+        return [File.objects.filter(space_id=space_id).first()]

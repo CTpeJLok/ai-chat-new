@@ -1,7 +1,15 @@
 import storage from '../storage'
 import { API_URL } from './client'
 
-export async function streamChat({ conversationId, spaceId, message, onChunk, onDone, onError }) {
+export async function streamChat({
+  conversationId,
+  spaceId,
+  message,
+  onChunk,
+  onSources,
+  onDone,
+  onError,
+}) {
   const token = await storage.getItem('access_token')
 
   try {
@@ -36,7 +44,11 @@ export async function streamChat({ conversationId, spaceId, message, onChunk, on
           return
         }
         try {
-          const { delta, error } = JSON.parse(payload)
+          const { delta, error, sources } = JSON.parse(payload)
+          if (sources) {
+            onSources?.(sources)
+            continue
+          }
           if (error) {
             onError?.(error)
             return
