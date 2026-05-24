@@ -20,6 +20,7 @@ import { API_URL } from '../../../src/api/client'
 import storage from '../../../src/storage'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
+import { downloadFile } from '../../../src/utils/downloadFile'
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams()
@@ -162,33 +163,7 @@ function MessageBubble({ message }) {
 }
 
 function SourceItem({ source }) {
-  const download = async () => {
-    const token = await storage.getItem('access_token')
-
-    if (Platform.OS === 'web') {
-      const res = await fetch(`${API_URL}/files/${source.id}/download/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const blob = await res.blob()
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = source.name
-      a.click()
-      return
-    }
-
-    const dest = FileSystem.documentDirectory + source.name
-    try {
-      const dl = await FileSystem.downloadAsync(`${API_URL}/files/${source.id}/download/`, dest, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(dl.uri)
-      }
-    } catch (e) {
-      Alert.alert('Ошибка', e.message)
-    }
-  }
+  const download = () => downloadFile(source.id, source.name)
 
   return (
     <TouchableOpacity

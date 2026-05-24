@@ -13,6 +13,7 @@ import { Plus, MessageCircle, Trash2 } from 'lucide-react-native'
 import { useSpaceStore } from '../../../src/stores/spaceStore'
 import client from '../../../src/api/client'
 import { confirm } from '../../../src/utils/confirm'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 export default function ChatListScreen() {
   const { currentSpace } = useSpaceStore()
@@ -76,7 +77,10 @@ export default function ChatListScreen() {
     )
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#f9fafb' }}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: '#f9fafb' }}
+      edges={['top']}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{currentSpace.name}</Text>
         <TouchableOpacity
@@ -138,7 +142,7 @@ export default function ChatListScreen() {
           </TouchableOpacity>
         )}
       />
-    </View>
+    </SafeAreaView>
   )
 }
 

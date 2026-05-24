@@ -23,6 +23,7 @@ class Message(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     sources = models.ManyToManyField(File, blank=True, related_name="messages")
+    log = models.TextField(blank=True)
 
     class Meta:
         ordering = ["created_at"]

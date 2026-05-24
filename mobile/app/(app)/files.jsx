@@ -19,6 +19,7 @@ import client from '../../src/api/client'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_URL } from '../../src/api/client'
 import { confirm } from '../../src/utils/confirm'
+import { downloadFile } from '../../src/utils/downloadFile'
 
 export default function FilesScreen() {
   const { currentSpace } = useSpaceStore()
@@ -86,35 +87,7 @@ export default function FilesScreen() {
     }
   }
 
-  const download = async (file) => {
-    if (Platform.OS === 'web') {
-      const token = await AsyncStorage.getItem('access_token')
-      const a = document.createElement('a')
-      a.href = `${API_URL}/files/${file.id}/download/`
-      a.setAttribute('download', file.name)
-      // Для web используем fetch с авторизацией
-      const res = await fetch(`${API_URL}/files/${file.id}/download/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const blob = await res.blob()
-      a.href = URL.createObjectURL(blob)
-      a.click()
-      return
-    }
-
-    const token = await AsyncStorage.getItem('access_token')
-    const dest = FileSystem.documentDirectory + file.name
-    try {
-      const dl = await FileSystem.downloadAsync(`${API_URL}/files/${file.id}/download/`, dest, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(dl.uri)
-      }
-    } catch (e) {
-      Alert.alert('Ошибка', e.message)
-    }
-  }
+  const download = (file) => downloadFile(file.id, file.name)
 
   const deleteFile = async (file) => {
     const ok = await confirm(`Удалить файл "${file.name}"?`)
